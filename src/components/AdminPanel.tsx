@@ -21,11 +21,18 @@ import {
   sendChatMessage
 } from '../firebase/services/chat';
 import {
+  getPricingConfig,
+  updatePricingConfig,
+  assignWorkRequestPrice
+} from '../firebase/services/pricing';
+import {
   WorkRequest,
   WithdrawalRequest,
   UserProfile,
   AdminAuditLog,
-  ChatMessage
+  ChatMessage,
+  PricingConfig,
+  PricingTier
 } from '../firebase/types';
 import {
   ShieldAlert,
@@ -43,20 +50,33 @@ import {
   Check,
   X,
   History,
-  Lock
+  Lock,
+  Tag,
+  Edit3,
+  Save,
+  ArrowLeft,
+  CheckCircle,
+  TrendingUp
 } from 'lucide-react';
 
-export const AdminPanel: React.FC = () => {
-  const { user, isAdmin } = useAuth();
-  const { t } = useLanguage();
+interface AdminPanelProps {
+  onExit?: () => void;
+}
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'requests' | 'withdrawals' | 'users' | 'chat' | 'audit'>('overview');
+export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
+  const { user, isAdmin } = useAuth();
+  const { language, t } = useLanguage();
+
+  const [activeTab, setActiveTab] = useState<'overview' | 'requests' | 'withdrawals' | 'users' | 'chat' | 'audit' | 'pricing'>('overview');
 
   // Data states
   const [workRequests, setWorkRequests] = useState<WorkRequest[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
+  const [editingPricing, setEditingPricing] = useState<PricingConfig | null>(null);
+  const [savingPricing, setSavingPricing] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Search & Filter
@@ -72,6 +92,14 @@ export const AdminPanel: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState<string>('');
   const [showApproveReqModal, setShowApproveReqModal] = useState(false);
   const [showRejectReqModal, setShowRejectReqModal] = useState(false);
+
+  // Price adjustment modal per work request
+  const [showAssignPriceModal, setShowAssignPriceModal] = useState(false);
+  const [reqForPriceAssign, setReqForPriceAssign] = useState<WorkRequest | null>(null);
+  const [targetPriceInput, setTargetPriceInput] = useState<string>('100');
+  const [targetCurrencyInput, setTargetCurrencyInput] = useState<'BDT' | 'USDT'>('BDT');
+  const [priceAssignNotes, setPriceAssignNotes] = useState<string>('');
+  const [savingRequestPrice, setSavingRequestPrice] = useState(false);
 
   // Withdrawal action modals
   const [selectedWdForAction, setSelectedWdForAction] = useState<WithdrawalRequest | null>(null);
@@ -92,16 +120,19 @@ export const AdminPanel: React.FC = () => {
     if (!isAdmin) return;
     setLoading(true);
     try {
-      const [reqs, wds, users, logs] = await Promise.all([
+      const [reqs, wds, users, logs, pConfig] = await Promise.all([
         getAllWorkRequests(),
         getAllWithdrawals(),
         getAllUsers(),
         getAdminAuditLogs(50),
+        getPricingConfig(),
       ]);
       setWorkRequests(reqs);
       setWithdrawals(wds);
       setUsersList(users);
       setAuditLogs(logs);
+      setPricingConfig(pConfig);
+      setEditingPricing(JSON.parse(JSON.stringify(pConfig)));
 
       if (reqs.length > 0 && !selectedChatReq) {
         setSelectedChatReq(reqs[0]);
@@ -242,6 +273,60 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  // Handle Save Dynamic Pricing Configuration
+  const handleSavePricing = async () => {
+    if (!editingPricing) return;
+    setSavingPricing(true);
+    try {
+      await updatePricingConfig(editingPricing);
+      setPricingConfig(JSON.parse(JSON.stringify(editingPricing)));
+      setActionFeedback({
+        message: language === 'bn' ? 'মূল্য নির্ধারণ সেটিংস সফলভাবে সংরক্ষিত হয়েছে।' : 'Pricing configuration successfully saved and published.',
+        type: 'success'
+      });
+      await loadAllAdminData();
+    } catch (err: any) {
+      setActionFeedback({
+        message: err.message || 'Failed to save pricing configuration.',
+        type: 'error'
+      });
+    } finally {
+      setSavingPricing(false);
+    }
+  };
+
+  // Handle Save Price for a Specific Work Request
+  const handleSaveRequestPrice = async () => {
+    if (!reqForPriceAssign) return;
+    const priceNum = parseFloat(targetPriceInput);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      setActionFeedback({ message: 'Price must be greater than zero.', type: 'error' });
+      return;
+    }
+
+    setSavingRequestPrice(true);
+    try {
+      await assignWorkRequestPrice({
+        requestId: reqForPriceAssign.id,
+        price: priceNum,
+        currency: targetCurrencyInput,
+        notes: priceAssignNotes.trim(),
+      });
+      setShowAssignPriceModal(false);
+      setReqForPriceAssign(null);
+      setPriceAssignNotes('');
+      setActionFeedback({
+        message: language === 'bn' ? 'অনুরোধের নির্ধারিত মূল্য সফলভাবে আপডেট করা হয়েছে।' : 'Target request price updated successfully.',
+        type: 'success'
+      });
+      await loadAllAdminData();
+    } catch (err: any) {
+      setActionFeedback({ message: err.message || 'Failed to assign price.', type: 'error' });
+    } finally {
+      setSavingRequestPrice(false);
+    }
+  };
+
   // Admin send reply in chat
   const handleSendAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,7 +382,31 @@ export const AdminPanel: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       
-      {/* Header */}
+      {/* Admin Top Bar with Exit to User Portal */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-3">
+          <img
+            src="https://raw.githubusercontent.com/mdrajidul99/mrs-engineers-assets/main/WS%20Sell%20World%20Logo.png"
+            alt="WS Sell World"
+            className="w-7 h-7 object-contain rounded"
+            referrerPolicy="no-referrer"
+          />
+          <span className="font-bold text-sm tracking-wide text-slate-900 dark:text-white">
+            WS Sell World Management Console
+          </span>
+        </div>
+        {onExit && (
+          <button
+            onClick={onExit}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>{t.userPortal}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Subheader and Tab Switcher */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <div className="flex items-center gap-2">
@@ -344,6 +453,17 @@ export const AdminPanel: React.FC = () => {
             }`}
           >
             {t.adminWithdrawals} ({pendingWds})
+          </button>
+          <button
+            onClick={() => setActiveTab('pricing')}
+            className={`px-3 py-1.5 rounded-md cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'pricing'
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400'
+            }`}
+          >
+            <Tag className="w-3.5 h-3.5 text-emerald-500" />
+            <span>{t.pricingManagement || 'Pricing'}</span>
           </button>
           <button
             onClick={() => setActiveTab('chat')}
@@ -578,6 +698,7 @@ export const AdminPanel: React.FC = () => {
                   <th className="pb-2 font-semibold">WhatsApp Number</th>
                   <th className="pb-2 font-semibold">Age</th>
                   <th className="pb-2 font-semibold">Status</th>
+                  <th className="pb-2 font-semibold">Target Price</th>
                   <th className="pb-2 font-semibold">Approved Earnings</th>
                   <th className="pb-2 font-semibold text-right">Actions</th>
                 </tr>
@@ -611,6 +732,15 @@ export const AdminPanel: React.FC = () => {
                         {r.status}
                       </span>
                     </td>
+                    <td className="py-3 font-mono whitespace-nowrap">
+                      {r.assignedPrice ? (
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {r.assignedCurrency === 'BDT' ? '৳' : '$'}{r.assignedPrice} {r.assignedCurrency || 'BDT'}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">Auto / Default</span>
+                      )}
+                    </td>
                     <td className="py-3 font-mono font-semibold whitespace-nowrap">
                       {r.approvedEarnings ? `+${r.approvedEarnings} ${r.approvedCurrency}` : '—'}
                     </td>
@@ -624,10 +754,27 @@ export const AdminPanel: React.FC = () => {
                       >
                         Chat
                       </button>
+                      {r.status === 'pending' && (
+                        <button
+                          onClick={() => {
+                            setReqForPriceAssign(r);
+                            setTargetPriceInput(r.assignedPrice ? r.assignedPrice.toString() : '100');
+                            setTargetCurrencyInput(r.assignedCurrency || 'BDT');
+                            setPriceAssignNotes(r.adminNotes || '');
+                            setShowAssignPriceModal(true);
+                          }}
+                          className="px-2 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 rounded border border-amber-200 dark:border-amber-800 cursor-pointer"
+                          title="Set Custom Price for this WhatsApp Request"
+                        >
+                          Set Price
+                        </button>
+                      )}
                       {r.status !== 'approved' && (
                         <button
                           onClick={() => {
                             setSelectedReqForAction(r);
+                            setEarningAmount(r.assignedPrice ? r.assignedPrice.toString() : '100');
+                            setEarningCurrency(r.assignedCurrency || 'BDT');
                             setShowApproveReqModal(true);
                           }}
                           className="px-2.5 py-1 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded cursor-pointer"
@@ -991,6 +1138,231 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
+      {/* 7. DYNAMIC PRICING MANAGEMENT TAB */}
+      {activeTab === 'pricing' && editingPricing && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-emerald-600" />
+                  <span>{t.pricingManagement || 'Dynamic WhatsApp Pricing Management'}</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Configure baseline purchase prices and tier pricing across account ages. Changes update live user estimates.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSavePricing}
+                disabled={savingPricing}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{savingPricing ? 'Saving Changes...' : (t.savePricingChanges || 'Save & Apply Pricing')}</span>
+              </button>
+            </div>
+
+            {/* Baseline Settings Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Default BDT Price (৳)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-slate-400 font-bold">৳</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={editingPricing.defaultBdtPrice}
+                    onChange={(e) =>
+                      setEditingPricing({
+                        ...editingPricing,
+                        defaultBdtPrice: Number(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full pl-8 pr-3 py-1.5 text-xs font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400">Standard payout for unaged line</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Default USDT Price ($)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-slate-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.05"
+                    value={editingPricing.defaultUsdtPrice}
+                    onChange={(e) =>
+                      setEditingPricing({
+                        ...editingPricing,
+                        defaultUsdtPrice: Number(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full pl-8 pr-3 py-1.5 text-xs font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400">Equivalent baseline in USDT</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Minimum BDT Price (৳)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-slate-400 font-bold">৳</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={editingPricing.minBdtPrice || 20}
+                    onChange={(e) =>
+                      setEditingPricing({
+                        ...editingPricing,
+                        minBdtPrice: Number(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full pl-8 pr-3 py-1.5 text-xs font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400">Floor price permitted</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Minimum USDT Price ($)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-slate-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    min="0.05"
+                    step="0.05"
+                    value={editingPricing.minUsdtPrice || 0.2}
+                    onChange={(e) =>
+                      setEditingPricing({
+                        ...editingPricing,
+                        minUsdtPrice: Number(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full pl-8 pr-3 py-1.5 text-xs font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400">Floor price permitted</span>
+              </div>
+            </div>
+
+            {/* Account Age Tiers Table */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Tiered Rates by Account Age
+              </h3>
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 text-[11px]">
+                    <tr>
+                      <th className="py-2.5 px-4 font-semibold">Tier Label</th>
+                      <th className="py-2.5 px-4 font-semibold">Min Age (Days)</th>
+                      <th className="py-2.5 px-4 font-semibold">BDT Payout (৳)</th>
+                      <th className="py-2.5 px-4 font-semibold">USDT Payout ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {editingPricing.tiers.map((tier, idx) => (
+                      <tr key={tier.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                        <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">
+                          <input
+                            type="text"
+                            value={tier.label}
+                            onChange={(e) => {
+                              const updatedTiers = [...editingPricing.tiers];
+                              updatedTiers[idx].label = e.target.value;
+                              setEditingPricing({ ...editingPricing, tiers: updatedTiers });
+                            }}
+                            className="w-full px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                          />
+                        </td>
+                        <td className="py-3 px-4 font-mono text-slate-500">
+                          <input
+                            type="number"
+                            min="0"
+                            value={tier.minAgeDays}
+                            onChange={(e) => {
+                              const updatedTiers = [...editingPricing.tiers];
+                              updatedTiers[idx].minAgeDays = Number(e.target.value) || 0;
+                              setEditingPricing({ ...editingPricing, tiers: updatedTiers });
+                            }}
+                            className="w-20 px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
+                          />
+                        </td>
+                        <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          <div className="flex items-center gap-1">
+                            <span>৳</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={tier.bdtPrice}
+                              onChange={(e) => {
+                                const updatedTiers = [...editingPricing.tiers];
+                                updatedTiers[idx].bdtPrice = Number(e.target.value) || 0;
+                                setEditingPricing({ ...editingPricing, tiers: updatedTiers });
+                              }}
+                              className="w-28 px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
+                            />
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          <div className="flex items-center gap-1">
+                            <span>$</span>
+                            <input
+                              type="number"
+                              min="0.1"
+                              step="0.1"
+                              value={tier.usdtPrice}
+                              onChange={(e) => {
+                                const updatedTiers = [...editingPricing.tiers];
+                                updatedTiers[idx].usdtPrice = Number(e.target.value) || 0;
+                                setEditingPricing({ ...editingPricing, tiers: updatedTiers });
+                              }}
+                              className="w-24 px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Notes / Instructions */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Pricing Guidelines & Admin Memo
+              </label>
+              <textarea
+                rows={2}
+                value={editingPricing.notes || ''}
+                onChange={(e) => setEditingPricing({ ...editingPricing, notes: e.target.value })}
+                placeholder="Official notes regarding pricing updates..."
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+              />
+              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                <span>Last updated: {new Date(editingPricing.updatedAt).toLocaleString()}</span>
+                <span>Editor: {editingPricing.updatedBy}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: APPROVE WORK REQUEST */}
       {showApproveReqModal && selectedReqForAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
@@ -1209,6 +1581,99 @@ export const AdminPanel: React.FC = () => {
                 className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg cursor-pointer"
               >
                 Confirm Rejection & Refund Funds
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ASSIGN / ADJUST WORK REQUEST PRICE */}
+      {showAssignPriceModal && reqForPriceAssign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Tag className="w-4 h-4 text-emerald-600" />
+              <span>Set Target Price for Request #{reqForPriceAssign.id.slice(-6)}</span>
+            </h3>
+
+            <p className="text-xs text-slate-500">
+              Account: {reqForPriceAssign.accountCountryCode} {reqForPriceAssign.whatsappNumber} ({reqForPriceAssign.username})
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Currency
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTargetCurrencyInput('BDT')}
+                    className={`p-2 rounded-lg border text-xs font-semibold cursor-pointer ${
+                      targetCurrencyInput === 'BDT'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600'
+                    }`}
+                  >
+                    BDT (৳)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTargetCurrencyInput('USDT')}
+                    className={`p-2 rounded-lg border text-xs font-semibold cursor-pointer ${
+                      targetCurrencyInput === 'USDT'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600'
+                    }`}
+                  >
+                    USDT ($)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Target Price ({targetCurrencyInput})
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={targetPriceInput}
+                  onChange={(e) => setTargetPriceInput(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Reason / Notes for Price (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={priceAssignNotes}
+                  onChange={(e) => setPriceAssignNotes(e.target.value)}
+                  placeholder="e.g. Premium active business account / high activity bonus"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAssignPriceModal(false)}
+                className="px-3 py-1.5 text-xs text-slate-500 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveRequestPrice}
+                disabled={savingRequestPrice}
+                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer disabled:opacity-50"
+              >
+                {savingRequestPrice ? 'Saving...' : 'Save Price'}
               </button>
             </div>
           </div>

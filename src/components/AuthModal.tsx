@@ -26,6 +26,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const { refreshProfile } = useAuth();
   const { language, t } = useLanguage();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot_password'>(initialMode);
+  const [isDomainError, setIsDomainError] = useState(false);
+
+  // Sync mode whenever initialMode or isOpen changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setError(null);
+      setSuccessMessage(null);
+      setIsDomainError(false);
+    }
+  }, [initialMode, isOpen]);
 
   // Form states
   const [username, setUsername] = useState('');
@@ -43,6 +54,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const resetForm = () => {
     setError(null);
     setSuccessMessage(null);
+    setIsDomainError(false);
     setPassword('');
     setConfirmPassword('');
   };
@@ -51,6 +63,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setError(null);
     setSuccessMessage(null);
+    setIsDomainError(false);
 
     const cleanUser = username.trim();
     if (!cleanUser) {
@@ -102,6 +115,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setError(null);
     setSuccessMessage(null);
+    setIsDomainError(false);
 
     if (!identifier.trim()) {
       setError(t.usernameOrEmail + ' is required.');
@@ -133,6 +147,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleLogin = async () => {
     setError(null);
+    setIsDomainError(false);
     setLoading(true);
     try {
       await loginWithGoogle(language);
@@ -140,7 +155,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: any) {
-      if (err.code !== 'auth/popup-closed-by-user') {
+      if (err.code === 'auth/popup-closed-by-user') {
+        // User voluntarily closed popup
+        return;
+      }
+      if (
+        err.code === 'auth/unauthorized-domain' ||
+        (err.message && err.message.toLowerCase().includes('unauthorized domain'))
+      ) {
+        setIsDomainError(true);
+        setError(
+          language === 'bn'
+            ? 'GitHub Pages ডোমেইন (mdrajidul99.github.io) এখনো Firebase Console-এ অনুমোদিত হয়নি। অনুগ্রহ করে Firebase Console > Authentication > Settings > Authorized domains-এ "mdrajidul99.github.io" যোগ করুন। বিকল্প হিসেবে আপনি এখনই সাধারণ Email & Password দিয়ে লগইন বা একাউন্ট খুলতে পারেন।'
+            : 'The domain (mdrajidul99.github.io) is not yet authorized in Firebase Authentication. Please add "mdrajidul99.github.io" under Firebase Console > Authentication > Settings > Authorized domains. Meanwhile, you can register or sign in instantly with Email & Password below.'
+        );
+      } else {
         setError(err.message || 'Google authentication failed.');
       }
     } finally {
@@ -152,6 +181,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setError(null);
     setSuccessMessage(null);
+    setIsDomainError(false);
 
     if (!email || !email.includes('@')) {
       setError(t.emailInvalid);
@@ -176,7 +206,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+        <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
             <img
               src="https://raw.githubusercontent.com/mdrajidul99/mrs-engineers-assets/main/WS%20Sell%20World%20Logo.png"
@@ -194,18 +224,73 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Top Segmented Navigation Tabs */}
+        {mode !== 'forgot_password' && (
+          <div className="grid grid-cols-2 p-1 mx-6 mt-4 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setMode('login');
+              }}
+              className={`py-2 rounded-md transition-all cursor-pointer ${
+                mode === 'login'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              {t.login}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setMode('register');
+              }}
+              className={`py-2 rounded-md transition-all cursor-pointer ${
+                mode === 'register'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              {t.register}
+            </button>
+          </div>
+        )}
+
         {/* Form Body */}
-        <div className="p-6">
+        <div className="p-6 pt-4">
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className={`mb-4 p-3.5 rounded-lg border flex flex-col gap-2 text-xs leading-relaxed ${
+              isDomainError
+                ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+                : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300'
+            }`}>
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-inherit" />
+                <span>{error}</span>
+              </div>
+              {isDomainError && (
+                <div className="pt-2 border-t border-amber-200 dark:border-amber-900/50 flex flex-wrap items-center gap-2">
+                  <span className="font-semibold">Quick Solution:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetForm();
+                      setMode('register');
+                    }}
+                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-bold cursor-pointer"
+                  >
+                    {t.register} with Email
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

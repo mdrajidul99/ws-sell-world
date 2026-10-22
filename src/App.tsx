@@ -17,6 +17,7 @@ import { WorkRequestSection } from './components/WorkRequestSection';
 import { WithdrawalSection } from './components/WithdrawalSection';
 import { TransactionLedgerSection } from './components/TransactionLedgerSection';
 import { AdminPanel } from './components/AdminPanel';
+import { AdminLogin } from './components/AdminLogin';
 import { ShieldAlert, Mail, RefreshCw, Lock } from 'lucide-react';
 import { checkEmailVerifiedStatus, resendVerificationEmail } from './firebase/auth';
 
@@ -40,7 +41,7 @@ function MainApp() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  // URL route parsing: supports GitHub Pages path (/ws-sell-world/Admin_19384), direct path (/Admin_19384), and hash (#/Admin_19384)
+  // URL route parsing: supports GitHub Pages path (/ws-sell-world/Admin_19384), direct path (/Admin_19384), hash (#/Admin_19384), and auth hashes (#/login, #/register)
   useEffect(() => {
     const handleUrlRoute = () => {
       const path = window.location.pathname;
@@ -48,6 +49,12 @@ function MainApp() {
 
       if (path.includes('Admin_19384') || hash.includes('Admin_19384') || hash === '#admin') {
         setCurrentView('admin');
+      } else if (hash === '#/login' || hash === '#login') {
+        setAuthMode('login');
+        setAuthModalOpen(true);
+      } else if (hash === '#/register' || hash === '#register' || hash === '#/signup') {
+        setAuthMode('register');
+        setAuthModalOpen(true);
       } else if (hash === '#/dashboard' || hash === '#dashboard') {
         setCurrentView('dashboard');
       } else if (hash === '#/sell_whatsapp' || hash === '#sell_whatsapp') {
@@ -111,6 +118,35 @@ function MainApp() {
 
   const isProtectedView = ['dashboard', 'sell_whatsapp', 'withdraw', 'transactions'].includes(currentView);
 
+  // Dedicated Admin Screen (no consumer navbar or marketing footer leakage)
+  if (currentView === 'admin') {
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-900 text-xs text-slate-400">
+          Loading Administrator Gateway...
+        </div>
+      );
+    }
+    if (!isAdmin) {
+      return (
+        <AdminLogin
+          onExit={() => navigateTo('home')}
+          onSuccess={() => setCurrentView('admin')}
+        />
+      );
+    }
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+        <main className="flex-1">
+          <AdminPanel onExit={() => navigateTo('home')} />
+        </main>
+        <footer className="border-t border-slate-800 py-3 text-center text-xs text-slate-500 font-mono">
+          WS Sell World Management Portal · Root Access Encrypted
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
       <Navbar
@@ -126,8 +162,6 @@ function MainApp() {
           <div className="flex items-center justify-center py-24 text-xs text-slate-400">
             Loading WS Sell World...
           </div>
-        ) : currentView === 'admin' ? (
-          <AdminPanel />
         ) : isProtectedView && !user ? (
           <div className="max-w-md mx-auto my-16 p-8 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-xs space-y-4">
             <Lock className="w-10 h-10 text-emerald-600 mx-auto" />

@@ -129,6 +129,22 @@
         "timestamp": { "type": "number" }
       },
       "required": ["conversationId", "senderUid", "text"]
+    },
+    "PricingConfig": {
+      "title": "PricingConfig",
+      "description": "Dynamic pricing configuration and account age tiers",
+      "type": "object",
+      "properties": {
+        "defaultBdtPrice": { "type": "number" },
+        "defaultUsdtPrice": { "type": "number" },
+        "minBdtPrice": { "type": "number" },
+        "minUsdtPrice": { "type": "number" },
+        "tiers": { "type": "array" },
+        "notes": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["defaultBdtPrice", "defaultUsdtPrice", "tiers"]
     }
   },
   "firestore": {
@@ -159,6 +175,10 @@
     "/conversations/{conversationId}/messages/{messageId}": {
       "schema": "ChatMessage",
       "description": "Real-time chat messages between user and administrator"
+    },
+    "/appConfig/{configDoc}": {
+      "schema": "PricingConfig",
+      "description": "Global application configuration including dynamic pricing"
     }
   }
 }

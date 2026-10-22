@@ -38,6 +38,11 @@ export async function createWorkRequest(params: {
   const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
   const conversationId = requestId; // 1-to-1 conversation per work request
 
+  // Calculate default baseline expectation
+  const age = params.accountAgeDays || 0;
+  const initialExpectedBDT = age >= 365 ? 250 : age >= 90 ? 180 : age >= 30 ? 120 : 80;
+  const initialExpectedUSDT = age >= 365 ? 2.5 : age >= 90 ? 1.8 : age >= 30 ? 1.2 : 0.8;
+
   const newRequest: WorkRequest = {
     id: requestId,
     userId: user.uid,
@@ -46,7 +51,11 @@ export async function createWorkRequest(params: {
     preferredLanguage: params.preferredLanguage,
     accountCountryCode: params.accountCountryCode || '+880',
     whatsappNumber: cleanNumber,
-    accountAgeDays: params.accountAgeDays || 0,
+    accountAgeDays: age,
+    expectedEarningsBDT: initialExpectedBDT,
+    expectedEarningsUSDT: initialExpectedUSDT,
+    assignedPrice: initialExpectedBDT,
+    assignedCurrency: 'BDT',
     status: 'pending',
     conversationId,
     adminNotes: params.notes || '',
@@ -187,6 +196,8 @@ export async function approveWorkRequest(params: {
     // Commit writes in transaction
     transaction.update(requestRef, {
       status: 'approved',
+      assignedPrice: params.earningAmount,
+      assignedCurrency: params.currency,
       approvedEarnings: params.earningAmount,
       approvedCurrency: params.currency,
       adminNotes: params.adminNotes || reqData.adminNotes || '',

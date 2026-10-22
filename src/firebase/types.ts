@@ -36,6 +36,17 @@ export interface WorkRequest {
   accountAgeDays?: number;
   expectedEarningsBDT?: number;
   expectedEarningsUSDT?: number;
+  assignedPrice?: number;
+  assignedCurrency?: 'BDT' | 'USDT';
+  priceSetBy?: string;
+  priceSetAt?: string;
+  priceHistory?: Array<{
+    price: number;
+    currency: 'BDT' | 'USDT';
+    updatedAt: string;
+    setBy: string;
+    notes?: string;
+  }>;
   approvedEarnings?: number;
   approvedCurrency?: 'BDT' | 'USDT';
   status: WorkRequestStatus;
@@ -46,6 +57,25 @@ export interface WorkRequest {
   updatedAt: string;
   reviewedAt?: string;
   reviewedBy?: string;
+}
+
+export interface PricingTier {
+  id: string;
+  label: string;
+  minAgeDays: number;
+  bdtPrice: number;
+  usdtPrice: number;
+}
+
+export interface PricingConfig {
+  defaultBdtPrice: number;
+  defaultUsdtPrice: number;
+  minBdtPrice: number;
+  minUsdtPrice: number;
+  tiers: PricingTier[];
+  notes?: string;
+  updatedAt: string;
+  updatedBy: string;
 }
 
 export type PaymentMethod = 'bKash' | 'Nagad' | 'USDT';

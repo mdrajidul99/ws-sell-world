@@ -177,6 +177,29 @@ export interface Translations {
   confirm: string;
   close: string;
   accessDeniedAdminOnly: string;
+
+  // Pricing & Admin login additions
+  pricingManagement: string;
+  pricingOverview: string;
+  defaultBdtPriceLabel: string;
+  defaultUsdtPriceLabel: string;
+  savePricingConfig: string;
+  setPriceForRequest: string;
+  assignedPriceLabel: string;
+  pricingUpdatedSuccess: string;
+  unauthorizedDomainTitle: string;
+  unauthorizedDomainDesc: string;
+  adminLoginTitle: string;
+  adminLoginDesc: string;
+  adminLoginButton: string;
+  returnToUserSite: string;
+  userPortal: string;
+  adminSecurityGateway: string;
+  savePricingChanges: string;
+  notAuthorizedAdminDesc: string;
+  switchAccount: string;
+  loginTab: string;
+  registerTab: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -348,7 +371,29 @@ export const translations: Record<Language, Translations> = {
     cancel: "Cancel",
     confirm: "Confirm",
     close: "Close",
-    accessDeniedAdminOnly: "Access Denied: Only authorized administrators may view this panel."
+    accessDeniedAdminOnly: "Access Denied: Only authorized administrators may view this panel.",
+
+    pricingManagement: "Pricing Management",
+    pricingOverview: "WhatsApp Lines Pricing Model",
+    defaultBdtPriceLabel: "Default Rate (BDT)",
+    defaultUsdtPriceLabel: "Default Rate (USDT)",
+    savePricingConfig: "Save Pricing Rules",
+    setPriceForRequest: "Set Request Price",
+    assignedPriceLabel: "Assigned Price",
+    pricingUpdatedSuccess: "Pricing rules updated and published successfully!",
+    savePricingChanges: "Save & Apply Pricing",
+    unauthorizedDomainTitle: "Firebase Authorized Domain Required",
+    unauthorizedDomainDesc: "Google Sign-In failed because this domain is not authorized in your Firebase Project. Please add mdrajidul99.github.io to Firebase Console > Authentication > Settings > Authorized domains.",
+    adminLoginTitle: "Administrator Portal Login",
+    adminSecurityGateway: "Administrator Security Gateway",
+    adminLoginDesc: "Sign in with authorized administrator credentials to manage work requests, live chat, pricing, and payouts.",
+    adminLoginButton: "Sign In as Administrator",
+    userPortal: "User Portal",
+    returnToUserSite: "Back to User Portal",
+    notAuthorizedAdminDesc: "Your account is signed in but does not have administrator privileges. Please switch to the designated administrator account.",
+    switchAccount: "Sign Out & Switch Account",
+    loginTab: "Log In",
+    registerTab: "Create Account"
   },
   bn: {
     brandName: "WS Sell World",
@@ -518,6 +563,28 @@ export const translations: Record<Language, Translations> = {
     cancel: "বাতিল",
     confirm: "নিশ্চিত করুন",
     close: "বন্ধ করুন",
-    accessDeniedAdminOnly: "প্রবেশাধিকার নিষিদ্ধ: কেবল অনুমোদিত অ্যাডমিন এই প্যানেল দেখতে পারেন।"
+    accessDeniedAdminOnly: "প্রবেশাধিকার নিষিদ্ধ: কেবল অনুমোদিত অ্যাডমিন এই প্যানেল দেখতে পারেন।",
+
+    pricingManagement: "মূল্য নির্ধারণ ব্যবস্থাপনা",
+    pricingOverview: "হোয়াটসঅ্যাপ লাইনের স্ট্যান্ডার্ড মূল্য কাঠামো",
+    defaultBdtPriceLabel: "ডিফল্ট রেট (BDT)",
+    defaultUsdtPriceLabel: "ডিফল্ট রেট (USDT)",
+    savePricingConfig: "মূল্য নিয়মাবলী সংরক্ষণ করুন",
+    setPriceForRequest: "অনুরোধের মূল্য নির্ধারণ করুন",
+    assignedPriceLabel: "নির্ধারিত মূল্য",
+    pricingUpdatedSuccess: "মূল্য কাঠামো সফলভাবে আপডেট ও সংরক্ষিত হয়েছে!",
+    savePricingChanges: "মূল্য পরিবর্তন সংরক্ষণ করুন",
+    unauthorizedDomainTitle: "ফায়ারবেস অনুমোদিত ডোমেন প্রয়োজন",
+    unauthorizedDomainDesc: "গুগল সাইন-ইন সম্পন্ন করা যায়নি কারণ আপনার ফায়ারবেস প্রজেক্টে এই ডোমেনটি অনুমোদিত তালিকায় নেই। অনুগ্রহ করে Firebase Console > Authentication > Settings > Authorized domains-এ mdrajidul99.github.io যুক্ত করুন।",
+    adminLoginTitle: "অ্যাডমিনিস্ট্রেটর পোর্টাল লগইন",
+    adminSecurityGateway: "অ্যাডমিন সিকিউরিটি গেটওয়ে",
+    adminLoginDesc: "কাজের অনুরোধ, লাইভ চ্যাট, মূল্য নির্ধারণ ও পেমেন্ট পরিচালনার জন্য নির্ধারিত অ্যাডমিন তথ্য দিয়ে প্রবেশ করুন।",
+    adminLoginButton: "অ্যাডমিন হিসেবে লগইন করুন",
+    userPortal: "ইউজার পোর্টাল",
+    returnToUserSite: "মূল ইউজার পোর্টালে ফিরুন",
+    notAuthorizedAdminDesc: "আপনার অ্যাকাউন্টটি সাধারণ ব্যবহারকারী হিসেবে লগইন করা রয়েছে। অ্যাডমিন ড্যাশবোর্ডে প্রবেশ করতে অনুগ্রহ করে অনুমোদিত অ্যাডমিন অ্যাকাউন্টে সুইচ করুন।",
+    switchAccount: "লগআউট করে অ্যাকাউন্ট পরিবর্তন করুন",
+    loginTab: "লগইন",
+    registerTab: "নতুন অ্যাকাউন্ট তৈরি"
   }
 };

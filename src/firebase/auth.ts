@@ -283,3 +283,6 @@ export async function requestPasswordReset(email: string): Promise<void> {
 export async function logoutUser(): Promise<void> {
   await signOut(auth);
 }
+
+export const logout = logoutUser;
+
