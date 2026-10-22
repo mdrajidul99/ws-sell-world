@@ -1,0 +1,164 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile with balances, role, and preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 50 },
+        "normalizedUsername": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "emailVerified": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "languagePreference": { "type": "string", "enum": ["en", "bn"] },
+        "themePreference": { "type": "string", "enum": ["system", "light", "dark"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "finances": { "type": "object" }
+      },
+      "required": ["uid", "username", "email", "role", "finances"]
+    },
+    "Username": {
+      "title": "Username",
+      "description": "Unique username reservation mapping",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "username"]
+    },
+    "WorkRequest": {
+      "title": "WorkRequest",
+      "description": "WhatsApp review work request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 50 },
+        "preferredLanguage": { "type": "string", "enum": ["en", "bn"] },
+        "accountCountryCode": { "type": "string", "maxLength": 10 },
+        "whatsappNumber": { "type": "string", "maxLength": 20 },
+        "accountAgeDays": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "rejectionReason": { "type": "string", "maxLength": 500 },
+        "adminNotes": { "type": "string", "maxLength": 1000 },
+        "approvedEarnings": { "type": "number" },
+        "approvedCurrency": { "type": "string", "enum": ["BDT", "USDT"] },
+        "conversationId": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "whatsappNumber", "status", "conversationId"]
+    },
+    "WithdrawalRequest": {
+      "title": "WithdrawalRequest",
+      "description": "User withdrawal request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 50 },
+        "method": { "type": "string", "enum": ["bKash", "Nagad", "USDT"] },
+        "currency": { "type": "string", "enum": ["BDT", "USDT"] },
+        "network": { "type": "string" },
+        "amount": { "type": "number" },
+        "recipientMobileNumber": { "type": "string", "maxLength": 30 },
+        "walletAddress": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["pending", "paid", "rejected", "refunded"] },
+        "transactionReference": { "type": "string", "maxLength": 128 },
+        "rejectionReason": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "method", "currency", "amount", "status"]
+    },
+    "TransactionLedgerItem": {
+      "title": "TransactionLedgerItem",
+      "description": "Auditable transaction ledger record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["approved_earning", "withdrawal_reserved", "withdrawal_paid", "withdrawal_refund", "authorized_adjustment"] },
+        "currency": { "type": "string", "enum": ["BDT", "USDT"] },
+        "amount": { "type": "number" },
+        "referenceId": { "type": "string", "maxLength": 64 },
+        "description": { "type": "string", "maxLength": 200 },
+        "status": { "type": "string", "enum": ["completed", "pending", "reversed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "actorId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "userId", "type", "currency", "amount", "status"]
+    },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Administrator action audit log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "actorUid": { "type": "string", "maxLength": 128 },
+        "actorEmail": { "type": "string", "maxLength": 128 },
+        "action": { "type": "string", "maxLength": 64 },
+        "targetType": { "type": "string", "maxLength": 64 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "details": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "actorUid", "action", "targetId"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Chat message item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "conversationId": { "type": "string", "maxLength": 64 },
+        "senderUid": { "type": "string", "maxLength": 128 },
+        "senderName": { "type": "string", "maxLength": 100 },
+        "senderRole": { "type": "string", "enum": ["user", "admin"] },
+        "text": { "type": "string", "maxLength": 1000 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["conversationId", "senderUid", "text"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User account document"
+    },
+    "/usernames/{username}": {
+      "schema": "Username",
+      "description": "Unique username reservation mapping"
+    },
+    "/workRequests/{requestId}": {
+      "schema": "WorkRequest",
+      "description": "WhatsApp review requests"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "WithdrawalRequest",
+      "description": "User withdrawal requests"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "TransactionLedgerItem",
+      "description": "Financial transaction ledger"
+    },
+    "/adminAuditLogs/{logId}": {
+      "schema": "AdminAuditLog",
+      "description": "Administrative actions audit trail"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Real-time chat messages between user and administrator"
+    }
+  }
+}

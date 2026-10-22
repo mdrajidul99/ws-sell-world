@@ -1,0 +1,150 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && (
+        request.auth.token.firebase.sign_in_provider == 'google.com' ||
+        request.auth.token.email_verified == true ||
+        isAdmin()
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.uid == 'ZMNTSLxjJWOBEK3DlnqxUXQycAO2' ||
+        (request.auth.token.email != null && request.auth.token.email == 'mrs.engineers.bd26@gmail.com')
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Global default-deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. User Profiles (/users/{userId})
+    match /users/{userId} {
+      // User can read their own profile, admin can read any profile
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // Creation during registration: must match auth UID, cannot self-assign admin role
+      allow create: if isOwner(userId) &&
+        request.resource.data.uid == userId &&
+        (request.resource.data.role == 'user' || isAdmin());
+
+      // Update: User can update their own language/theme preferences or profile info,
+      // but only admin or atomic transactions can modify privileged fields like 'role' or 'finances'
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'email'])
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // 2. Usernames (/usernames/{username})
+    match /usernames/{username} {
+      // Allow exact single-document read to resolve login by username
+      allow get: if true;
+      // Disallow collection-wide list enumeration to protect user privacy
+      allow list: if isAdmin();
+      // Allow reservation if signing up
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // 3. Work Requests (/workRequests/{requestId})
+    match /workRequests/{requestId} {
+      // User can read their own requests; Admin can read all
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isVerifiedUser() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      // Create: Verified user can submit work request with status 'pending'
+      allow create: if isVerifiedUser() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      // Update: Admin can approve/reject/modify; User can only update if pending
+      allow update: if isAdmin() || (
+        isVerifiedUser() &&
+        resource.data.userId == request.auth.uid &&
+        resource.data.status == 'pending' &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'approvedEarnings', 'approvedCurrency', 'reviewedBy'])
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // 4. Withdrawal Requests (/withdrawals/{withdrawalId})
+    match /withdrawals/{withdrawalId} {
+      // User can read their own withdrawals; Admin can read all
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isVerifiedUser() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      // Create: Verified user can submit withdrawal request with status 'pending'
+      allow create: if isVerifiedUser() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.amount > 0;
+
+      // Update: Admin can mark paid or reject/refund; User cannot change status
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 5. Transaction Ledger (/transactions/{transactionId})
+    match /transactions/{transactionId} {
+      // User can read their own transactions; Admin can read all
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isVerifiedUser() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      // Write: Authorized transaction write (user reservation write or admin action)
+      allow create: if isVerifiedUser() && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // 6. Admin Audit Logs (/adminAuditLogs/{logId})
+    match /adminAuditLogs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 7. Conversations & Messages (/conversations/{conversationId}/messages/{messageId})
+    match /conversations/{conversationId}/messages/{messageId} {
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.senderUid == request.auth.uid ||
+        conversationId.matches('.*' + request.auth.uid + '.*') ||
+        exists(/databases/$(database)/documents/workRequests/$(conversationId)) &&
+        get(/databases/$(database)/documents/workRequests/$(conversationId)).data.userId == request.auth.uid
+      );
+
+      allow create: if isVerifiedUser() && (
+        isAdmin() ||
+        request.resource.data.senderUid == request.auth.uid
+      );
+      allow update, delete: if isAdmin();
+    }
+  }
+}

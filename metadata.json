@@ -1,0 +1,6 @@
+{
+  "name": "WS Sell World",
+  "description": "WS Sell World - WhatsApp account review, work requests, live admin chat, secure balance ledger, and instant bKash, Nagad & USDT withdrawals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
